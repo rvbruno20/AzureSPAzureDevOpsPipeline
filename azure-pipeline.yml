@@ -1,0 +1,51 @@
+# =============================================================================
+# Pipeline information
+# =============================================================================
+name: 'Service Principal Management'
+
+trigger: none
+
+# =============================================================================
+# Schedules
+# =============================================================================
+
+schedules:
+- cron: "00 06 * * 1"
+  displayName: "Weekly – Monday 06:00 UTC"
+  branches:
+    include:
+    - master
+  always: true 
+
+# =============================================================================
+# Pipeline Variables (App Selecting)
+# =============================================================================
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: secret-management-pipeline
+
+parameters:
+
+  - name: applications
+    type: object
+    default:
+      - '<service-principal-name-1>'
+      - '<service-principal-name-2>'
+      - '<service-principal-name-3>'
+
+# =============================================================================
+# Pipeline Structure
+# =============================================================================
+
+
+stages:
+
+- ${{ each app in parameters.applications }}:
+
+  - template: ./pipeline/structure/pipeline_structure.yml
+    parameters:
+      appName: ${{ replace(replace(app, '-', '_'), ' ', '_') }}
+      application: ${{ app }}

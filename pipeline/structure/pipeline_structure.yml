@@ -1,0 +1,76 @@
+# =============================================================================
+# Parameters
+# =============================================================================
+
+parameters:
+
+  - name: appName
+    type: string
+    default: []
+
+  - name: application
+    type: object
+    default: []
+
+# =============================================================================
+# Stage Initalization
+# =============================================================================
+
+stages:
+
+# ===========================================================================
+# Stage 1: Check for Secret Expiration
+# ===========================================================================
+
+- stage: Secret_Management_${{ parameters.appName }}
+  jobs:
+
+    - job: secret_expiration_job
+      steps:
+
+        - task: AzurePowershell@5
+          name: secret_check_task
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            azurePowerShellVersion: 'LatestVersion'
+            scriptType: 'FilePath'
+            scriptPath: $(Build.SourcesDirectory)/scripts/Test-AppRegistrationSecretExpiration.ps1
+            ScriptArguments: >-
+              -appRegistration '${{ parameters.application }}'
+    
+    - job: app_reg_job
+      dependsOn: secret_expiration_job
+      condition: eq(dependencies.secret_expiration_job.outputs['secret_check_task.depend'], 'true')
+      steps:
+
+        - task: AzurePowershell@5
+          name: app_reg_secret
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            azurePowerShellVersion: 'LatestVersion'
+            scriptType: 'FilePath'
+            scriptPath: $(Build.SourcesDirectory)/scripts/New-AppRegistrationSecret.ps1
+            ScriptArguments: >-
+              -appRegistration '${{ parameters.application }}'
+
+    - job: save_secret_kv_job
+      dependsOn: app_reg_job
+      condition: succeeded()
+      variables:
+        secretValue: $[ dependencies.app_reg_job.outputs['app_reg_secret.secretValue'] ]
+      steps:
+
+        - task: AzurePowershell@5
+          name: save_to_kv
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            azurePowerShellVersion: 'LatestVersion'
+            scriptType: 'FilePath'
+            scriptPath: $(Build.SourcesDirectory)/scripts/Save-AppRegistrationSecretToKeyVault.ps1
+            ScriptArguments: >-
+              -appRegistration '${{ replace(replace(parameters.application, '-', ''), ' ', '') }}'
+              -passwordValue '$(secretValue)'
+              -keyVaultName '$(vgKeyVaultName)'
+              -keyVaultRG '$(vgKeyVaultResourceGroup)'
+              -keyVaultSubName '$(vgKeyVaultSubscription)'
+
