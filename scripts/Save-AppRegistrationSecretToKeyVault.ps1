@@ -7,7 +7,7 @@ param(
     [string]$appRegistration,
 
     [Parameter(Mandatory=$true)]
-    [string]$passwordValue,
+    [securestring]$passwordValue,
 
     [Parameter(Mandatory=$true)]
     [string]$keyVaultName,
@@ -18,12 +18,6 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$keyVaultSubName
 )
-
-# ==============================
-# Secret to SecureString
-# ==============================
-
-$securePassword = ConvertTo-SecureString -String $passwordValue -AsPlainText -Force 
 
 # ==============================
 # Error Action
@@ -51,6 +45,9 @@ try {
     
         Write-Output "Azure Key Vault [$($keyVault.VaultName)] has been identified."
 
+        $myIp = (Invoke-WebRequest -Uri 'https://api.ipify.org').Content.Trim()
+        Write-Output "Whitelisting public IP [$myIp] for Key Vault access."
+
         # Whitelist IP
         Add-AzKeyVaultNetworkRule -VaultName $keyVault.VaultName -IpAddressRange $myIp
 
@@ -61,13 +58,13 @@ try {
             
             Write-Output "A secret with the name [$($appRegistration)] already exist. Updating it with the new secret..."
 
-            $secret = Set-AzKeyVaultSecret -VaultName $keyVaultName -Name $appRegistration -SecretValue $securePassword
+            Set-AzKeyVaultSecret -VaultName $keyVaultName -Name $appRegistration -SecretValue $passwordValue
 
         }else{
 
             Write-Output "No secret with the name [$($appRegistration)] exist. Creating a new entry now..."
 
-            $secret = Set-AzKeyVaultSecret -VaultName $keyVaultName -Name $appRegistration -SecretValue $securePassword
+            Set-AzKeyVaultSecret -VaultName $keyVaultName -Name $appRegistration -SecretValue $passwordValue
 
         }
 
