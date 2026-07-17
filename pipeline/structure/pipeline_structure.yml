@@ -74,3 +74,26 @@ stages:
               -keyVaultRG '$(vgKeyVaultResourceGroup)'
               -keyVaultSubName '$(vgKeyVaultSubscription)'
 
+    - job: notify_logic_app_job
+      dependsOn: save_secret_kv_job
+      condition: succeeded()
+      steps:
+
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.x'
+
+        - task: PythonScript@0
+          name: send_notification_payload
+          inputs:
+            scriptSource: 'filePath'
+            scriptPath: $(Build.SourcesDirectory)/scripts/Send-AppRegistrationRotationNotification.py
+            arguments: >-
+              --app-registration '${{ parameters.application }}'
+              --key-vault-name '$(vgKeyVaultName)'
+              --logic-app-url '$(vgLogicAppUrl)'
+              --pipeline-name '$(Build.DefinitionName)'
+              --run-id '$(Build.BuildId)'
+              --collection-uri '$(System.CollectionUri)'
+              --project-name '$(System.TeamProject)'
+
